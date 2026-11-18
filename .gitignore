@@ -1,0 +1,19 @@
+# Never commit deployed configuration or client credentials.
+private/
+deployment/
+output/
+exports/
+client-bundle/
+client.json
+verification.json
+*.zip
+*.key
+*.pem
+*.crt
+.env
+.env.*
+!.env.example
+.venv/
+__pycache__/
+*.pyc
+.DS_Store

@@ -1,0 +1,46 @@
+{
+  "xray": {
+    "version": "v26.11.9",
+    "prerelease": false,
+    "assets": {
+      "linux-amd64": {
+        "url": "https://github.com/XTLS/Xray-core/releases/download/v26.11.9/Xray-linux-64.zip",
+        "sha256": "b651f7e1d9966ee2c1b1ee1bf8b52c72771824d3065dce96bbc8bcc19ed95f82"
+      },
+      "linux-arm64": {
+        "url": "https://github.com/XTLS/Xray-core/releases/download/v26.11.9/Xray-linux-arm64-v8a.zip",
+        "sha256": "64ed6858982a7f5eb85d88b811089063bd4f17561f4c8f44e0f1dc8e6f6430be"
+      },
+      "darwin-amd64": {
+        "url": "https://github.com/XTLS/Xray-core/releases/download/v26.11.9/Xray-macos-64.zip",
+        "sha256": "488963e676e06f5e48547f9dd38116aaca8de4234959b4272ae8f284e658dfd0"
+      },
+      "darwin-arm64": {
+        "url": "https://github.com/XTLS/Xray-core/releases/download/v26.11.9/Xray-macos-arm64-v8a.zip",
+        "sha256": "233f0c66681cd0726f81a6b2b6ed6a5710869e312047b522e46ed53035bebd26"
+      }
+    }
+  },
+  "hysteria": {
+    "version": "app/v2.14.0",
+    "prerelease": false,
+    "assets": {
+      "linux-amd64": {
+        "url": "https://github.com/HyNetworks/hysteria/releases/download/app/v2.14.0/hysteria-linux-amd64",
+        "sha256": "fc25edff9948708cb00a4ff01f3bccde677660aca050133bb1ad46c6860362d2"
+      },
+      "linux-arm64": {
+        "url": "https://github.com/HyNetworks/hysteria/releases/download/app/v2.14.0/hysteria-linux-arm64",
+        "sha256": "e7c52241299fe85aba11e9d36e85d8d88ddbb5799ac0e33d272219d20e313bab"
+      },
+      "darwin-amd64": {
+        "url": "https://github.com/HyNetworks/hysteria/releases/download/app/v2.14.0/hysteria-darwin-amd64",
+        "sha256": "37a3ef3649b5a8fd24799b285d413b1d38afa71e2c4c1d564efe3c3b65880efe"
+      },
+      "darwin-arm64": {
+        "url": "https://github.com/HyNetworks/hysteria/releases/download/app/v2.14.0/hysteria-darwin-arm64",
+        "sha256": "c68aa6677f15e572f997b346bcdf193b45a9dc9071b7e9555efffc8694c5ec05"
+      }
+    }
+  }
+}
