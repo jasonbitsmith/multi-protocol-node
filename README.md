@@ -133,3 +133,29 @@ tests/                        离线行为测试
 欢迎提交脱敏的问题报告或 PR，附操作系统、架构、客户端版本、失败阶段和已遮蔽凭证的日志。不要提交真实服务器地址、账号密码、私钥、订阅或二维码。
 
 项目脚本与文档使用 [MIT License](LICENSE)。Xray、Hysteria、qrcode 等上游组件保留各自许可证；本仓库不分发它们的二进制。仅管理自有或明确获授权的服务器，并遵守适用规定和服务商条款。
+
+## 📬 联系方式
+
+- 𝕏：[@evanwritesx](https://x.com/evanwritesx)
+- Telegram：[@EvanCreates](https://t.me/EvanCreates)
+- TG 交流群：[t.me/jason_Telegramx](https://t.me/jason_Telegramx)
+- TG 频道：[t.me/APPKITLIFE](https://t.me/APPKITLIFE)
+
+<a id="support"></a>
+
+## ☕ 支持项目
+
+如果这个项目帮你省下了搭建和维护个人节点的时间，欢迎自愿赞赏，支持项目维护与持续更新。感谢每一份支持，也欢迎通过 Star、Issue 或 PR 参与项目。
+
+<table>
+  <tr>
+    <th align="center">支付宝</th>
+    <th align="center">微信赞赏</th>
+  </tr>
+  <tr>
+    <td align="center"><a href="assets/sponsor/alipay.jpg"><img src="assets/sponsor/alipay.jpg" alt="支付宝收款二维码" width="240" /></a></td>
+    <td align="center"><a href="assets/sponsor/wechat.jpg"><img src="assets/sponsor/wechat.jpg" alt="Jason 的微信赞赏码" width="240" /></a></td>
+  </tr>
+</table>
+
+使用对应 App 扫码，或点击图片查看原图后保存识别。赞赏完全自愿，项目仍可免费使用。
