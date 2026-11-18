@@ -91,7 +91,7 @@ def export(out):
     hy = client_configs(m, ports=(10806, 10807, 10808), ca_path='hy.crt')['hysteria2']
     hy['http'] = {'listen': '127.0.0.1:10809'}
     secure_write(client / 'hysteria-client.json', json.dumps(hy, indent=2))
-    notes = '''# 客户使用说明 / Client guide
+    notes = '''# 个人使用说明 / Personal-use guide
 
 主用：01 REALITY；兼容备用：02 Shadowsocks；UDP 备选：03 Hysteria 2。
 三者使用同一台服务器，不构成独立线路容灾。导出不代表已经通过验证。

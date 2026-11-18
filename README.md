@@ -1,10 +1,10 @@
 # Multi Protocol Node
 
-**把一台 VPS 配成三种协议，并交付可验证的客户端资料。**
+**为个人自用搭建三协议 VPS 节点，生成可验证的设备配置。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-面向自有或获授权的 Debian / Ubuntu 服务器，提供 **Codex Skill + 独立 Python 工具**。兼容搬瓦工、DMIT 等普通 VPS，不绑定服务商，不要求购买域名。
+面向个人自用的自有或获授权 Debian / Ubuntu 服务器，提供 **Codex Skill + 独立 Python 工具**。兼容搬瓦工、DMIT 等普通 VPS，不绑定服务商，不要求购买域名。
 
 | 协议 | 默认端口 | 用途 |
 |---|---|---|
@@ -19,7 +19,7 @@
 - 检查平台、端口和已有防火墙，拒绝覆盖已有部署。
 - 固定 Xray / Hysteria 版本，校验发布文件 SHA-256 后才执行。
 - 独立随机凭证、开机自启、服务异常重启；普通安装失败会清理本次新建资源。
-- 导出链接、可选二维码、证书和客户说明；服务端私钥与 SSH 密码不进入交付包。
+- 导出链接、可选二维码、证书和个人使用说明；服务端私钥与 SSH 密码不进入个人配置包。
 - 从外部通过三个实际代理连接请求 HTTPS，记录成功与失败，不把“服务启动”当成“能用”。
 
 不会自动装面板、开 SSH 免密、改个人 Surge、购买域名、添加 DNS、开启 WARP 或调整供应商防火墙。
@@ -34,7 +34,7 @@ cp -R multi-protocol-node/skills/multi-protocol-node ~/.codex/skills/
 
 若同名 Skill 已存在，请先比较版本，不要盲目覆盖。重新打开或刷新支持 Skill 的会话，然后输入：
 
-> 使用 $multi-protocol-node，帮我在已授权的 VPS 上配置多协议节点。已有 SSH 别名为 my-vps，客户使用 Windows 和 iPhone。先检查旧服务，再部署并做外部验证。
+> 使用 $multi-protocol-node，帮我在已授权的 VPS 上配置多协议节点。已有 SSH 别名为 my-vps，我自己使用 Windows 和 iPhone。先检查旧服务，再部署并做外部验证。
 
 Skill 本身不授予服务器访问权限；沿用使用者已有的 SSH 登录方式。其他能够读取 `SKILL.md` 的代理也可以按说明调用脚本。
 
@@ -62,7 +62,7 @@ pip install -r skills/multi-protocol-node/requirements-export.txt
 python skills/multi-protocol-node/scripts/node.py install \
   --ssh my-vps --host YOUR_PUBLIC_IPV4 --target YOUR_REALITY_TARGET
 
-# 在仓库外保存私密资料。目录必须是新的，防止覆盖已有客户凭证。
+# 在仓库外保存私密资料。目录必须是新的，防止覆盖已有个人节点凭证。
 python skills/multi-protocol-node/scripts/node.py fetch \
   --ssh my-vps --output "$HOME/private-node-exports/my-vps"
 
@@ -75,9 +75,9 @@ python skills/multi-protocol-node/scripts/node.py verify \
 
 端口可改：`--reality-port 8443 --hysteria-port 8443 --ss-port 8388`。TCP 和 UDP 可共用端口号，SS 则占用两者。已有防火墙时会要求先检查，`--firewall-reviewed` 只确认已检查，不会替你开放端口。供应商安全组也须允许对应端口。
 
-## 客户交付
+## 个人设备使用
 
-只发 `client-bundle.zip`。里面包含：
+将 `client-bundle.zip` 私密保存并传到自己的设备。里面包含：
 
 - REALITY、Shadowsocks、Hysteria 2 各自链接；安装二维码依赖后也有二维码。
 - 默认批量导入文件（REALITY + SS）。
@@ -108,7 +108,7 @@ python -m unittest discover -s tests -v
 python tests/smoke_binaries.py --xray /path/to/xray --hysteria /path/to/hysteria
 ```
 
-测试覆盖：端口冲突、参数拒绝、密钥输出兼容、错误校验和、压缩包路径安全、私钥不进入客户包、证书 pin 保留、失败回滚和未归属安装的卸载保护。附带的 CI 模板只运行离线测试，不访问或部署真实客户服务器。
+测试覆盖：端口冲突、参数拒绝、密钥输出兼容、错误校验和、压缩包路径安全、私钥不进入个人配置包、证书 pin 保留、失败回滚和未归属安装的卸载保护。附带的 CI 模板只运行离线测试，不访问或部署真实使用中的服务器。
 
 本机真实二进制冒烟测试验证过 Xray 配置，以及 Hy2 的 CA + 正确指纹握手和错误指纹拒绝。它只监听临时本机端口，不等于远端公网连通性验证。
 

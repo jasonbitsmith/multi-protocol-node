@@ -1,4 +1,4 @@
-"""Optional local binary smoke test. No VPS access or customer credentials.
+"""Optional local binary smoke test. No VPS access or personal credentials.
 
 python tests/smoke_binaries.py --xray /path/to/xray --hysteria /path/to/hysteria
 Validates Xray configuration and authenticates Hy2 on loopback using a generated
