@@ -1,10 +1,26 @@
 # Operations and limits
 
+## Six-protocol mode (default)
+
+Six protocols use `mpn-xray` (SS), `mpn-hysteria` (Hy2), and `mpn-extra` (sing-box: REALITY/Trojan/TUIC/AnyTLS). Defaults: TCP443 REALITY, TCP8443 Trojan, UDP24443 Hy2, UDP8443 TUIC, TCP9443 AnyTLS, TCP/UDP8388 SS. TCP80 must be free and reachable for public-ip certificate issuance and renewal.
+
+Public-IP mode uses a pinned acme.sh script and stores its state inside `/opt/multi-protocol-node/acme`; it does not alter global cron or shell profiles. `mpn-certificate.timer` checks every six hours. Renewal restarts Hy2 and sing-box. Check `journalctl -u mpn-certificate` and `systemctl list-timers mpn-certificate.timer`. Certificate issuance publishes the IP to the CA/CT logs. Never mask certificate errors by skipping verification.
+
+Provided mode requires existing target-server certificate/key paths; the installer validates trust, name, key match and at least one day of validity before copying. Configure your existing certificate manager to replace `/opt/multi-protocol-node/public-fullchain.pem` and `public-key.pem` securely, then run `systemctl restart mpn-hysteria mpn-extra`. This mode creates no renewal timer; source-file updates alone do not update the copied files.
+
+`status` checks proxy units, renewal timer when installed, and certificate lifetime (fails within 24 hours of expiry). `uninstall` checks a manifest and ownership before deleting all managed units, timer and ACME state. It never deletes provided source files. No in-place migration from three-protocol or manually extended deployments is performed.
+
+Six-mode exports include six links, sing-box and Mihomo profiles. The default import is REALITY + Trojan; automatic selection excludes SS. Verification uses sing-box and returns failure if any of the six HTTPS checks fail. See [protocol choice](protocol-choice.md) for security and network recommendations.
+
+## Legacy three-protocol mode
+
+The following details apply to `--profile three` and existing v1 installations unless stated otherwise.
+
 ## Prerequisites and ports
 
 Run orchestration on Linux/macOS with Python 3.10+ and OpenSSH. On Windows use WSL; Windows proxy clients can consume the exported links without WSL. Target: Debian/Ubuntu, systemd, Python 3.10+, `curl`, `openssl`, `iproute2` (`ss`). Install missing prerequisites with the host's package manager only within authorized scope. No control panel is required.
 
-Default ports: TCP 443 (REALITY), UDP 443 (Hy2), TCP/UDP 8388 (SS). Cloud/provider firewalls are separate from host firewall rules. Allow only the chosen inbound ports while preserving SSH access. The installer neither edits nor flushes firewall rules. `--firewall-reviewed` means an operator already reviewed them, not that they are correct.
+New default ports: TCP 443 (REALITY), UDP 24443 (Hy2; existing v1 installs may use 443), TCP/UDP 8388 (SS). Cloud/provider firewalls are separate from host firewall rules. Allow only the chosen inbound ports while preserving SSH access. The installer neither edits nor flushes firewall rules. `--firewall-reviewed` means an operator already reviewed them, not that they are correct.
 
 SSH defaults to port 22, including when using an alias; pass `--ssh-port` explicitly for other ports. SSH host fingerprints must already be trusted. Password-based OpenSSH may prompt multiple times. Prefer an existing configured key/agent but never introduce new access rights implicitly.
 

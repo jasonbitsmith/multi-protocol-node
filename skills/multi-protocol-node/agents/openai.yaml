@@ -1,4 +1,4 @@
 interface:
   display_name: "Multi Protocol Node"
-  short_description: "搭建个人自用多协议 VPS 节点，导出设备配置并验证连接"
-  default_prompt: "使用 $multi-protocol-node 检查我的 VPS，部署个人自用多协议节点并生成经过验证的个人设备配置包。"
+  short_description: "搭建个人自用六协议 VPS 节点，导出设备配置并验证连接"
+  default_prompt: "使用 $multi-protocol-node 检查我的 VPS，部署个人自用六协议节点并生成经过验证的个人设备配置包。"

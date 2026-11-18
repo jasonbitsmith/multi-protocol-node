@@ -1,30 +1,46 @@
 # Multi Protocol Node
 
-**为个人自用搭建三协议 VPS 节点，生成可验证的设备配置。**
+**个人自用六协议 VPS 部署 Skill：搭建、证书续期、配置导出和连接验证。**
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-面向个人自用的自有或获授权 Debian / Ubuntu 服务器，提供 **Codex Skill + 独立 Python 工具**。兼容搬瓦工、DMIT 等普通 VPS，不绑定服务商，不要求购买域名。
+面向自有或明确获授权的 Debian / Ubuntu 服务器，提供 **Codex Skill + 独立 Python 工具**。兼容搬瓦工、DMIT 等普通 VPS，不绑定服务商。默认六协议，不要求购买域名；保留旧三协议模式及其配置导出、验证能力。
 
-| 协议 | 默认端口 | 用途 |
+| 协议 | 默认端口 | 定位 |
 |---|---|---|
-| VLESS + REALITY + XTLS Vision | TCP 443 | 推荐主用，无需自行申请域名证书 |
-| Hysteria 2 | UDP 443 | UDP 网络可用时的备选，固定证书指纹 |
-| Shadowsocks AEAD | TCP / UDP 8388 | 兼容备用，chacha20-ietf-poly1305 |
+| VLESS + REALITY + Vision | TCP 443 | 推荐主用，REALITY 握手验证 |
+| Trojan | TCP 8443 | TCP / TLS 备用，可信证书验证 |
+| Hysteria 2 | UDP 24443 | UDP 可用时测试速度和稳定性 |
+| TUIC | UDP 8443 | QUIC 备选，关闭 0-RTT |
+| AnyTLS | TCP 9443 | 支持新版客户端时的 TCP / TLS 备选 |
+| Shadowsocks AEAD | TCP / UDP 8388 | 兼容备用，不具备前向保密 |
 
-多协议不等于多线路：三者仍共用一台服务器。不会承诺“永不被封”或某协议一定更快。SS 不具备前向保密，当前 Xray 已提示其弃用；本项目保留它仅用于兼容。
+## 什么环境用什么协议？
 
-## 提供什么
+**先保证身份验证正确，再考虑可用性和速度。没有一种协议在所有环境下都“最安全”。**
 
-- 检查平台、端口和已有防火墙，拒绝覆盖已有部署。
-- 固定 Xray / Hysteria 版本，校验发布文件 SHA-256 后才执行。
-- 独立随机凭证、开机自启、服务异常重启；普通安装失败会清理本次新建资源。
-- 导出链接、可选二维码、证书和个人使用说明；服务端私钥与 SSH 密码不进入个人配置包。
-- 从外部通过三个实际代理连接请求 HTTPS，记录成功与失败，不把“服务启动”当成“能用”。
+| 环境 | 项目建议 |
+|---|---|
+| 家庭宽带、日常办公 | REALITY 主用，Trojan 备用 |
+| 陌生 Wi-Fi | 使用已验证服务端身份的 REALITY / Trojan；保持 HTTPS，不跳过证书校验 |
+| UDP 不通或被限制 | REALITY / Trojan / AnyTLS 等 TCP 方案 |
+| 蜂窝网络、丢包但 UDP 可用 | 实测 Hysteria 2 / TUIC，并保留 TCP 备用 |
+| 大文件、视频 | 比较持续吞吐和稳定性；低延迟不代表更安全或下载更快 |
+| 新版客户端、希望尝试其他实现 | AnyTLS，先检查支持与实际连接 |
+| 旧客户端只能用 SS | SS 兼容备用，优先升级客户端 |
 
-不会自动装面板、开 SSH 免密、改个人 Surge、购买域名、添加 DNS、开启 WARP 或调整供应商防火墙。
+完整说明：[协议选择与安全边界](skills/multi-protocol-node/references/protocol-choice.md)。其中包括证书、0-RTT、前向保密、DNS/TUN 覆盖与账号隐私的区别，并附官方来源。多协议共用一台服务器，不是独立线路容灾，也不保证不可识别或不会被封。
 
-## 方式一：作为 Skill 使用
+## 功能
+
+- 检查系统、端口和已有防火墙；拒绝覆盖旧部署，不修改 SSH 或个人 Surge。
+- 固定 Xray、sing-box、Hysteria 与 acme.sh 版本/提交，SHA-256 验证后执行。
+- 六协议默认使用公共 IP 证书，定时续期；也可使用已有可信证书。
+- 独立随机凭证、开机自启、失败重启；普通安装异常清理本次创建的目录与服务。
+- 私密导出链接、可选二维码、sing-box 配置、Mihomo 配置和个人使用说明。
+- 逐协议外部 HTTPS 验证，失败返回非零退出码，不把“启动了”当成“能用了”。
+
+## 安装为 Skill
 
 ```sh
 git clone https://github.com/jasonbitsmith/multi-protocol-node.git
@@ -32,107 +48,110 @@ mkdir -p ~/.codex/skills
 cp -R multi-protocol-node/skills/multi-protocol-node ~/.codex/skills/
 ```
 
-若同名 Skill 已存在，请先比较版本，不要盲目覆盖。重新打开或刷新支持 Skill 的会话，然后输入：
+已有同名 Skill 时先比较版本，不要盲目覆盖。重新打开或刷新支持 Skill 的会话后输入：
 
-> 使用 $multi-protocol-node，帮我在已授权的 VPS 上配置多协议节点。已有 SSH 别名为 my-vps，我自己使用 Windows 和 iPhone。先检查旧服务，再部署并做外部验证。
+> 使用 $multi-protocol-node，在我的 VPS 上部署六协议个人节点。SSH 别名是 my-vps，我自己使用 Windows 和 iPhone。检查现有服务，配置可靠的证书续期，最后验证连接并生成配置包。
 
-Skill 本身不授予服务器访问权限；沿用使用者已有的 SSH 登录方式。其他能够读取 `SKILL.md` 的代理也可以按说明调用脚本。
+Skill 沿用已有授权和 SSH 登录方式，不包含服务器密码。支持读取 `SKILL.md` 的其他代理也能使用脚本。
 
-## 方式二：直接运行
+## 直接运行
 
-本地：Linux/macOS、Python 3.10+、OpenSSH、curl。Windows 操作者可用 WSL。
-
-服务器：Debian/Ubuntu、systemd、Python 3.10+、OpenSSL、curl、iproute2，支持 amd64/arm64；本版本要求公网 IPv4。缺失依赖可在确认目标机器后安装：
+本地需要 Linux/macOS、Python 3.10+、OpenSSH、curl；Windows 可用 WSL。服务器需要 Debian/Ubuntu、systemd、Python 3.10+，支持 amd64/arm64，当前要求公网 IPv4。确认目标机器后可安装依赖：
 
 ```sh
 apt-get update
-apt-get install -y python3 curl openssl iproute2 ca-certificates
+apt-get install -y python3 curl openssl iproute2 ca-certificates socat
 ```
 
-先正常 SSH 登录，核对主机指纹。以下使用已经配置好的 root SSH 别名 `my-vps`。非 22 端口需要给每个远程命令加 `--ssh-port 实际端口`。
+先正常 SSH 登录并核对主机指纹。示例使用 root SSH 别名 `my-vps`；非 22 端口需要每次显式添加 `--ssh-port 实际端口`。用真实值替换大写占位符。
 
 ```sh
 cd multi-protocol-node
 python3 -m venv .venv
 . .venv/bin/activate
-# 可选；安装后 fetch 会附带二维码
+# 可选：生成二维码
 pip install -r skills/multi-protocol-node/requirements-export.txt
 
-# 将两个占位值替换为真实公网 IPv4 和经确认合适的 REALITY 目标主机名。
+# 默认 --profile six --tls-mode public-ip
 python skills/multi-protocol-node/scripts/node.py install \
   --ssh my-vps --host YOUR_PUBLIC_IPV4 --target YOUR_REALITY_TARGET
 
-# 在仓库外保存私密资料。目录必须是新的，防止覆盖已有个人节点凭证。
+# 必须使用新的私密输出目录，建议放在代码仓库外
 python skills/multi-protocol-node/scripts/node.py fetch \
   --ssh my-vps --output "$HOME/private-node-exports/my-vps"
 
-# 必须在 VPS 外运行；任一协议失败则退出码非零。
+# 在 VPS 外执行，不要用服务端自测冒充外部可达
 python skills/multi-protocol-node/scripts/node.py verify \
   --directory "$HOME/private-node-exports/my-vps"
 ```
 
-脚本不提供 REALITY 目标的通用默认值：目标须从服务器可达、支持 TLS 1.3 / h2；被 Xray 明确警告的目标会被拒绝。有关选择与失败排查，见 [运维说明](skills/multi-protocol-node/references/operations.md)。
+REALITY 目标须从服务器可达、支持 TLS 1.3 / h2，仍需外部握手测试。本项目不提供“永远安全”的默认目标。
 
-端口可改：`--reality-port 8443 --hysteria-port 8443 --ss-port 8388`。TCP 和 UDP 可共用端口号，SS 则占用两者。已有防火墙时会要求先检查，`--firewall-reviewed` 只确认已检查，不会替你开放端口。供应商安全组也须允许对应端口。
+### 证书与端口
 
-## 个人设备使用
+默认模式自动向 Let's Encrypt 注册 ACME 账号、签发 IP 短期证书，申请会将公网 IP 提交给 CA 并写入公开证书透明度记录。签发使用 HTTP-01：**TCP80 必须空闲且公网可达**，后续续期也需要。ACME 账号和证书都保存在本项目的私密目录，不改全局 cron。
 
-将 `client-bundle.zip` 私密保存并传到自己的设备。里面包含：
+IP 证书有效期约六天。本项目每六小时检查续期；签发/续期成功后重启相应服务，可能短暂重连。不要封禁验证端口，也不要忽略定时器失败。[CA 官方说明](https://letsencrypt.org/2026/01/15/6day-and-ip-general-availability)
 
-- REALITY、Shadowsocks、Hysteria 2 各自链接；安装二维码依赖后也有二维码。
-- 默认批量导入文件（REALITY + SS）。
-- 官方 Hysteria 客户端配置与公开证书。
-- iPhone / Windows 操作说明。
+若已有可信证书，文件路径指向**目标服务器上的文件**：
 
-**Hysteria 2 必须保留证书指纹校验。** 自签名链接使用 `insecure=1` 与 `pinSHA256` 配对；若某客户端丢弃指纹，不能仅靠“跳过证书验证”使用它。所以默认批量导入不含 Hy2。另一种方式是使用包内官方客户端配置，它同时启用自定义 CA 和指纹校验。
+```sh
+python skills/multi-protocol-node/scripts/node.py install \
+  --ssh my-vps --host YOUR_PUBLIC_IPV4 --target YOUR_REALITY_TARGET \
+  --tls-mode provided --tls-name YOUR_CERTIFICATE_NAME \
+  --cert-file /etc/your-certs/fullchain.pem --key-file /etc/your-certs/key.pem
+```
 
-导出包、节点链接和二维码都是访问凭证，请勿提交到公开仓库。客户端版本是否完整支持相关参数，需要在实际设备上检查；生成文件不代表已经在手机导入或同步。
+provided 模式验证公共信任链、IP/域名、私钥匹配及剩余有效期后复制证书。**它不自动接管续期**：原证书管理器须将新文件部署到本项目目录并重启对应服务。详见 [运维说明](skills/multi-protocol-node/references/operations.md)。
 
-## 查看与卸载
+所有端口可参数化：`--reality-port`、`--trojan-port`、`--hysteria-port`、`--tuic-port`、`--anytls-port`、`--ss-port`。TCP/UDP 可以共用数字，但同一传输不能重复；公共 IP 证书模式另保留 TCP80。
+
+脚本不修改主机防火墙和供应商安全组。发现已有规则会停止，确认允许所需端口后可使用 `--firewall-reviewed`；该参数不会替你放行任何端口。
+
+### 三协议与旧安装
+
+新部署加 `--profile three` 可使用原三协议方案（REALITY、Hy2、SS）。Hy2 使用自签名证书及精确指纹，不申请公共 IP 证书。新部署的 Hy2 默认端口统一为 UDP24443；已有配置端口保持原值。
+
+`fetch` / `verify` 会识别旧三协议元数据。**没有原地升级、自动收缩或强制重装功能**：已有服务一律拒绝覆盖。手动扩展过的非标准部署也不会自动接管，应先备份和制定迁移方案。
+
+## 个人设备配置
+
+将 `client-bundle.zip` 私密传到自己的设备。六协议包包含：
+
+- 六种协议的独立链接及可选二维码。
+- `default-import.txt`：REALITY + Trojan；`all-protocols.txt`：全部六种。
+- `sing-box.json`：本机 HTTP/SOCKS 10808，默认 REALITY。
+- `Clash-Mihomo.yaml`：可手动选择或对前五种协议自动测速；**SS 不参加 Auto**。
+- 个人使用说明。包内不含 SSH 密码、服务端私钥或 ACME 账号。
+
+iPhone 可用支持相应协议的 Shadowrocket 扫码；Windows 可用最新版 v2rayN 导入链接并选择相应核心，或用兼容 Mihomo 的客户端导入配置。AnyTLS/TUIC 等必须确认客户端支持；没有测试过的 App 版本不能仅凭成功导出就判定兼容。
+
+六协议配置保持证书验证开启，不用自签名证书固定指纹，公共证书续期不要求重新分发 pin。旧三协议 Hy2 的指纹逻辑不同，不能混用。
+
+导出的是基本代理配置，默认不提供国内分流、不接管系统 DNS，也不是完整手机 TUN 配置。需要全设备代理时自行配置 TUN/VPN 与 DNS，再检查实际覆盖范围。所有链接和二维码均为访问凭证，请勿上传公开仓库。
+
+## 状态、卸载与测试
 
 ```sh
 python skills/multi-protocol-node/scripts/node.py status --ssh my-vps
-# 只在确实需要移除此安装时执行；会断开使用这些节点的全部客户端。
+# 会断开此安装上的全部连接；同时移除其续期资源
 python skills/multi-protocol-node/scripts/node.py uninstall --ssh my-vps
-```
 
-安装位置为 `/opt/multi-protocol-node`，服务为 `mpn-xray` / `mpn-hysteria`。卸载会检查所有权标记，仅移除本项目的服务和目录，不修改 SSH、防火墙或其他服务。本版本不做自动更新或覆盖升级。
-
-## 验证范围
-
-部署方案已在 Ubuntu amd64 VPS 上验证过三个协议的外部 HTTPS 连通性；这来自整理前的实际部署。公开版脚本增加了参数化、失败回滚和包导出保护，有离线自动化测试；**尚不代表所有发行版、架构、手机客户端的完整端到端认证**。
-
-```sh
 python -m unittest discover -s tests -v
-# 可选：使用自己下载并校验过的官方二进制做本机冒烟测试。
-python tests/smoke_binaries.py --xray /path/to/xray --hysteria /path/to/hysteria
+# 可选：使用已校验的官方二进制做本机协议冒烟测试
+python tests/smoke_binaries.py --xray /path/to/xray --hysteria /path/to/hysteria \
+  --sing-box /path/to/sing-box --mihomo /path/to/mihomo
 ```
 
-测试覆盖：端口冲突、参数拒绝、密钥输出兼容、错误校验和、压缩包路径安全、私钥不进入个人配置包、证书 pin 保留、失败回滚和未归属安装的卸载保护。附带的 CI 模板只运行离线测试，不访问或部署真实使用中的服务器。
+六协议对应 `mpn-xray`（SS）、`mpn-hysteria`（Hy2）、`mpn-extra`（REALITY/Trojan/TUIC/AnyTLS），公共 IP 模式还包括证书服务与定时器。数据位于 `/opt/multi-protocol-node`。卸载验证所有权并仅删除受管资源，不改 SSH、防火墙和外部证书源文件。
 
-本机真实二进制冒烟测试验证过 Xray 配置，以及 Hy2 的 CA + 正确指纹握手和错误指纹拒绝。它只监听临时本机端口，不等于远端公网连通性验证。
+验证覆盖包括：旧三协议兼容、六协议端口冲突、TLS 与 0-RTT 默认值、导出凭证隔离、证书/服务失败回滚、续期资源卸载。真实二进制验证过生成的配置与正确/错误指纹握手；六协议方案已在 Ubuntu amd64 及 sing-box/Mihomo 客户端上实测。**这不等于所有发行版、架构和手机 App 均完成端到端认证。**
 
-如需启用 GitHub Actions，将 `examples/github-actions-tests.yml` 复制为 `.github/workflows/tests.yml` 并提交。推送该文件需要 GitHub 凭据具有工作流写入权限；初始发布未启用自动 CI。
-
-## 项目结构
-
-```text
-skills/multi-protocol-node/
-  SKILL.md                     AI 代理入口
-  agents/openai.yaml           Codex 元数据
-  scripts/node.py              SSH 部署、导出和验证
-  scripts/server.py            服务器安装、状态、卸载
-  scripts/common.py            配置与下载校验
-  scripts/versions.lock.json   上游版本与 SHA-256
-  references/operations.md     运维、限制与官方参考
-tests/                        离线行为测试
-```
+可将 `examples/github-actions-tests.yml` 复制为 `.github/workflows/tests.yml` 启用离线 CI；推送需要工作流写入权限，当前仅提供模板，不会部署真实服务器。
 
 ## 贡献与许可
 
-欢迎提交脱敏的问题报告或 PR，附操作系统、架构、客户端版本、失败阶段和已遮蔽凭证的日志。不要提交真实服务器地址、账号密码、私钥、订阅或二维码。
-
-项目脚本与文档使用 [MIT License](LICENSE)。Xray、Hysteria、qrcode 等上游组件保留各自许可证；本仓库不分发它们的二进制。仅管理自有或明确获授权的服务器，并遵守适用规定和服务商条款。
+欢迎提交脱敏问题报告或 PR，说明系统、架构、客户端版本与失败阶段，不要附服务器登录信息、私钥或二维码。本项目脚本和文档采用 [MIT License](LICENSE)，下载的上游软件保留各自许可证。仅管理自有或明确获授权的服务器。
 
 ## 📬 联系方式
 

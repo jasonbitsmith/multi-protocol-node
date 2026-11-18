@@ -42,5 +42,32 @@
         "sha256": "c68aa6677f15e572f997b346bcdf193b45a9dc9071b7e9555efffc8694c5ec05"
       }
     }
+  },
+  "sing-box": {
+    "version": "v1.14.4",
+    "prerelease": false,
+    "assets": {
+      "linux-amd64": {
+        "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-linux-amd64.tar.gz",
+        "sha256": "699a1b510aa4396b2176d32d1181920399ebf1e267835da6f3b598d0f7c24968"
+      },
+      "linux-arm64": {
+        "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-linux-arm64.tar.gz",
+        "sha256": "436441f76ee2f7fe21b5b2d426d3cb261a480455a704865789ad533e4273ec26"
+      },
+      "darwin-amd64": {
+        "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-darwin-amd64.tar.gz",
+        "sha256": "eae86b9b033bba50b7c44ab719e4bfac0aca05efd28483390ed3aa510f32db25"
+      },
+      "darwin-arm64": {
+        "url": "https://github.com/SagerNet/sing-box/releases/download/v1.14.4/sing-box-1.14.4-darwin-arm64.tar.gz",
+        "sha256": "0d8c7f5ed5d587b0f1a5e9772a708ec3bfa4ac4c9329604b01d8d9c2ba406838"
+      }
+    }
+  },
+  "acme.sh": {
+    "commit": "7e87a310fda61afe92e3db6ac29f81efdf53b8c0",
+    "url": "https://raw.githubusercontent.com/acmesh-official/acme.sh/7e87a310fda61afe92e3db6ac29f81efdf53b8c0/acme.sh",
+    "sha256": "b4d1a37add59bd50c0d7624a553e9446073b864c1006e9ffb44fa0da7adaef15"
   }
 }

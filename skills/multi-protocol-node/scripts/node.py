@@ -31,18 +31,27 @@ def remote(args):
         raise ValueError('Invalid SSH port')
     if args.action == 'install':
         validate_options(args.host, args.target, (args.reality_port, args.hysteria_port, args.ss_port))
+        if args.profile == 'six':
+            from six_protocols import bindings
+            bindings(vars(args), args.tls_mode == 'public-ip')
     # mktemp allocates a private directory. Transport delegates authentication to OpenSSH.
     tmp = subprocess.check_output(ssh_command(args, 'mktemp -d /tmp/mpn.XXXXXXXX'), text=True).strip()
     if not re.fullmatch(r'/tmp/mpn\.[a-zA-Z0-9]+', tmp):
         raise RuntimeError('Unexpected SSH output; no remote command executed')
     try:
-        files = [str(HERE / n) for n in ('server.py', 'common.py', 'versions.lock.json')]
+        files = [str(HERE / n) for n in ('server.py', 'common.py', 'six_protocols.py', 'versions.lock.json')]
         subprocess.run(['scp', '-P', str(args.ssh_port), '-o', 'StrictHostKeyChecking=yes',
                         *files, args.ssh + ':' + tmp + '/'], check=True)
         cmd = ['python3', tmp + '/server.py', args.action]
         if args.action == 'install':
             cmd += ['--host', args.host, '--target', args.target, '--reality-port', str(args.reality_port),
-                    '--hysteria-port', str(args.hysteria_port), '--ss-port', str(args.ss_port)]
+                    '--hysteria-port', str(args.hysteria_port), '--ss-port', str(args.ss_port), '--profile', args.profile]
+            if args.profile == 'six':
+                cmd += ['--trojan-port', str(args.trojan_port), '--tuic-port', str(args.tuic_port),
+                        '--anytls-port', str(args.anytls_port), '--tls-mode', args.tls_mode]
+                for flag, value in [('--tls-name', args.tls_name), ('--cert-file', args.cert_file), ('--key-file', args.key_file)]:
+                    if value is not None:
+                        cmd += [flag, value]
             if args.firewall_reviewed:
                 cmd.append('--firewall-reviewed')
         subprocess.run(ssh_command(args, shlex.join(cmd)), check=True)
@@ -58,10 +67,15 @@ def fetch(args):
         raise ValueError('Output exists; choose a new private directory')
     out.mkdir(parents=True, mode=0o700)
     try:
-        for name in ('client.json', 'hy.crt'):
+        for name in ('client.json',):
             subprocess.run(['scp', '-P', str(args.ssh_port), '-o', 'StrictHostKeyChecking=yes',
                             args.ssh + ':' + str(ROOT / name), str(out / name)], check=True)
             (out / name).chmod(0o600)
+        m = json.loads((out / 'client.json').read_text())
+        if m.get('profile') != 'six':
+            subprocess.run(['scp', '-P', str(args.ssh_port), '-o', 'StrictHostKeyChecking=yes',
+                            args.ssh + ':' + str(ROOT / 'hy.crt'), str(out / 'hy.crt')], check=True)
+            (out / 'hy.crt').chmod(0o600)
         export(out)
     except BaseException:
         shutil.rmtree(out)
@@ -70,6 +84,8 @@ def fetch(args):
 
 def export(out):
     m = json.loads((out / 'client.json').read_text())
+    if m.get('profile') == 'six':
+        return export_six(out, m)
     client = out / 'client-bundle'
     client.mkdir(mode=0o700)  # Deliberately refuse overwriting a previous export.
     links = share_links(m)
@@ -124,6 +140,45 @@ UDP 超时但 REALITY 正常时，先用 REALITY，再换 Wi-Fi/蜂窝网络检�
     print('Client package saved: ' + str(out / 'client-bundle.zip'))
 
 
+def export_six(out, m):
+    from six_protocols import client_profile, mihomo_profile
+    client = out / 'client-bundle'
+    client.mkdir(mode=0o700)
+    links = share_links(m)
+    allowed = set()
+    try:
+        import qrcode
+    except ImportError:
+        qrcode = None
+    for name, link in links.items():
+        secure_write(client / (name + '.txt'), link + '\n'); allowed.add(name + '.txt')
+        if qrcode:
+            qrcode.make(link).save(client / (name + '.png')); allowed.add(name + '.png')
+    files = {
+        'default-import.txt': links['01-REALITY'] + '\n' + links['02-Trojan'] + '\n',
+        'all-protocols.txt': '\n'.join(links.values()) + '\n',
+        'sing-box.json': json.dumps(client_profile(m), ensure_ascii=False, indent=2),
+        'Clash-Mihomo.yaml': json.dumps(mihomo_profile(m), ensure_ascii=False, indent=2),
+        'README.txt': '''个人使用说明（六协议）
+主用 REALITY，TCP 备用 Trojan；UDP 正常时可测试 Hysteria 2 / TUIC。
+AnyTLS 需新版客户端支持；Shadowsocks 仅作兼容备用，不具备前向保密。
+所有 TLS 节点都启用证书验证，不要开启“跳过证书验证”。
+iPhone：支持对应协议的 Shadowrocket 扫码或导入链接。Windows：最新版 v2rayN 从剪贴板导入，并选择相应核心。
+Mihomo：导入 Clash-Mihomo.yaml。默认 REALITY，Auto 只测速前五个协议，SS 必须手动选择。
+sing-box.json：本机 HTTP/SOCKS 10808；不是手机 TUN 配置，不会自动覆盖每个 App。
+配置默认全代理，没有承诺国内直连或 DNS 防泄漏；按你的应用/路由需求调整，并实际验证。
+六种协议共用一台服务器，不是六条独立线路。导出不代表已通过外部验证。
+公网证书必须及时续期。public-ip 模式由服务器定时检查；provided 模式需要自行维护证书部署。
+所有链接/二维码都是访问凭证，请私密保存。包内不包含 SSH 密码、服务端私钥或 ACME 账号。
+'''}
+    for name, content in files.items():
+        secure_write(client / name, content); allowed.add(name)
+    with zipfile.ZipFile(out / 'client-bundle.zip', 'x', zipfile.ZIP_DEFLATED) as z:
+        for name in sorted(allowed):
+            z.write(client / name, 'client-bundle/' + name)
+    print('Six-protocol personal bundle: ' + str(out / 'client-bundle.zip'))
+
+
 def verify(args):
     directory = Path(args.directory).resolve()
     m = json.loads((directory / 'client.json').read_text())
@@ -133,23 +188,35 @@ def verify(args):
         raise ValueError('Verification needs Linux/macOS, curl, amd64/arm64')
     lock = json.loads((HERE / 'versions.lock.json').read_text())
     results = {}
+    extended = m.get('profile') == 'six'
     with tempfile.TemporaryDirectory(prefix='mpn-verify-') as tmp:
         work = Path(tmp)
-        for name in ('xray', 'hysteria'):
-            download_asset(lock[name]['assets'][system + '-' + arch], work / name, 'xray' if name == 'xray' else None)
+        for name in (('sing-box',) if extended else ('xray', 'hysteria')):
+            download_asset(lock[name]['assets'][system + '-' + arch], work / name,
+                           zip_member='xray' if name == 'xray' else None,
+                           tar_member='sing-box' if name == 'sing-box' else None)
         # Allocate different free local ports; later verify process is still alive.
         sockets = []
-        for _ in range(3):
+        count = 6 if extended else 3
+        for _ in range(count):
             s = socket.socket(); s.bind(('127.0.0.1', 0)); sockets.append(s)
         ports = [s.getsockname()[1] for s in sockets]
-        configs = client_configs(m, ports, directory / 'hy.crt')
+        if extended:
+            from six_protocols import outbounds
+            configs = {ob['tag']: {'log': {'level': 'warn'},
+                'inbounds': [{'type': 'mixed', 'listen': '127.0.0.1', 'listen_port': port}],
+                'outbounds': [ob], 'route': {'final': ob['tag']}}
+                for ob, port in zip(outbounds(m), ports)}
+        else:
+            configs = client_configs(m, ports, directory / 'hy.crt')
         for s in sockets:
             s.close()
         for (name, config), port in zip(configs.items(), ports):
             conf = work / (name + '.json')
             secure_write(conf, json.dumps(config))
-            cmd = ([str(work / 'hysteria'), 'client', '-c', str(conf)] if name == 'hysteria2'
-                   else [str(work / 'xray'), 'run', '-config', str(conf)])
+            cmd = ([str(work / 'sing-box'), 'run', '-c', str(conf)] if extended else
+                   ([str(work / 'hysteria'), 'client', '-c', str(conf)] if name == 'hysteria2'
+                   else [str(work / 'xray'), 'run', '-config', str(conf)]))
             with (work / (name + '.log')).open('w') as log:
                 proc = subprocess.Popen(cmd, stdout=log, stderr=log)
                 try:
@@ -171,6 +238,8 @@ def verify(args):
                     trace = dict(line.split('=', 1) for line in response.stdout.splitlines() if '=' in line)
                     results[name] = {'ok': response.returncode == 0 and bool(trace.get('ip')) and proc.poll() is None,
                                      'exit_ip': trace.get('ip'), 'location': trace.get('loc')}
+                except (subprocess.TimeoutExpired, OSError) as exc:
+                    results[name] = {'ok': False, 'reason': type(exc).__name__}
                 finally:
                     proc.terminate()
                     try:
@@ -179,7 +248,7 @@ def verify(args):
                         proc.kill(); proc.wait()
                     print(name + ': ' + ('PASS' if results.get(name, {}).get('ok') else 'FAIL'))
         secure_write(directory / 'verification.json', json.dumps(results, indent=2))
-    return 0 if len(results) == 3 and all(r['ok'] for r in results.values()) else 1
+    return 0 if len(results) == count and all(r['ok'] for r in results.values()) else 1
 
 
 def main():
@@ -193,9 +262,17 @@ def main():
         if action == 'install':
             p.add_argument('--host', required=True, help='Server public IPv4')
             p.add_argument('--target', required=True, help='REALITY target hostname; no default')
+            p.add_argument('--profile', choices=['six', 'three'], default='six')
             p.add_argument('--reality-port', type=int, default=443)
-            p.add_argument('--hysteria-port', type=int, default=443)
+            p.add_argument('--hysteria-port', type=int, default=24443)
             p.add_argument('--ss-port', type=int, default=8388)
+            p.add_argument('--trojan-port', type=int, default=8443)
+            p.add_argument('--tuic-port', type=int, default=8443)
+            p.add_argument('--anytls-port', type=int, default=9443)
+            p.add_argument('--tls-mode', choices=['public-ip', 'provided'], default='public-ip')
+            p.add_argument('--tls-name')
+            p.add_argument('--cert-file', help='Existing full chain path on the target server')
+            p.add_argument('--key-file', help='Existing private key path on the target server')
             p.add_argument('--firewall-reviewed', action='store_true')
         if action == 'fetch':
             p.add_argument('--output', required=True, help='New private output directory')

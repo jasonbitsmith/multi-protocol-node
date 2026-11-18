@@ -18,6 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'skills/multi-proto
 from common import client_configs, secure_write, server_configs
 from server import parse_keys
 from test_node import metadata
+from test_six import six_metadata
+import six_protocols as six
 
 
 def free_port(kind=socket.SOCK_STREAM):
@@ -37,6 +39,8 @@ def stop(proc):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--xray', required=True); p.add_argument('--hysteria', required=True)
+    p.add_argument('--sing-box', help='Also check six-protocol server/client schemas')
+    p.add_argument('--mihomo', help='Also check the exported six-protocol Mihomo profile')
     args = p.parse_args()
     with tempfile.TemporaryDirectory(prefix='mpn-smoke-') as tmp:
         root = Path(tmp)
@@ -48,6 +52,23 @@ def main():
             '-subj', '/CN=mpn-node', '-addext', 'subjectAltName=DNS:mpn-node'], check=True, capture_output=True)
         der = subprocess.check_output(['openssl', 'x509', '-in', str(root / 'hy.crt'), '-outform', 'DER'])
         m['hy_pin'] = hashlib.sha256(der).hexdigest()
+        if args.sing_box or args.mihomo:
+            full = dict(six_metadata(), public_key=m['public_key'])
+            (root / 'public-fullchain.pem').write_bytes((root / 'hy.crt').read_bytes())
+            (root / 'public-key.pem').write_bytes((root / 'hy.key').read_bytes())
+            rendered = six.configs(full, private, root)
+            for name, config in rendered.items():
+                secure_write(root / ('six-' + name), json.dumps(config))
+            subprocess.run([args.xray, 'run', '-test', '-config', str(root / 'six-xray.json')], check=True, capture_output=True)
+            if args.sing_box:
+                subprocess.run([args.sing_box, 'check', '-c', str(root / 'six-sing-box.json')], check=True, capture_output=True)
+                secure_write(root / 'six-client.json', json.dumps(six.client_profile(full)))
+                subprocess.run([args.sing_box, 'check', '-c', str(root / 'six-client.json')], check=True, capture_output=True)
+                print('Six-protocol Xray / sing-box server and client schemas: PASS')
+            if args.mihomo:
+                secure_write(root / 'mihomo.yaml', json.dumps(six.mihomo_profile(full)))
+                subprocess.run([args.mihomo, '-t', '-f', str(root / 'mihomo.yaml'), '-d', str(root / 'mihomo')], check=True, capture_output=True)
+                print('Six-protocol Mihomo profile: PASS')
         x, h = server_configs(m, private, root)
         h['listen'] = '127.0.0.1:' + str(m['hysteria_port'])
         secure_write(root / 'xray.json', json.dumps(x))

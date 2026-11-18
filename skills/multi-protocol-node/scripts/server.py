@@ -20,11 +20,13 @@ UNIT_DIR = Path('/etc/systemd/system')
 MARKER = 'multi-protocol-node/v1'
 
 
-def run(*args, check=True, **kw):
-    return subprocess.run(args, check=check, text=True, capture_output=True, timeout=30, **kw)
+def run(*args, check=True, timeout=30, **kw):
+    return subprocess.run(args, check=check, text=True, capture_output=True, timeout=timeout, **kw)
 
 
 def preflight(args):
+    import six_protocols as six
+    extended = getattr(args, 'profile', 'three') == 'six'
     validate_options(args.host, args.target, (args.reality_port, args.hysteria_port, args.ss_port))
     if ipaddress.ip_address(args.host).version != 4:
         raise ValueError('This release requires a public IPv4 address')
@@ -38,10 +40,24 @@ def preflight(args):
             raise RuntimeError('Missing prerequisite: ' + cmd)
     if ROOT.exists() or ROOT.is_symlink():
         raise RuntimeError(f'{ROOT} already exists; use status/export, never overwrite')
-    for service in SERVICES:
-        if (UNIT_DIR / (service + '.service')).exists() or run('systemctl', 'cat', service, check=False).returncode == 0:
+    units = list(six.SERVICES) + list(six.CERT_UNITS) if extended else list(SERVICES)
+    for service in units:
+        unit_name = service if service.endswith(('.service', '.timer')) else service + '.service'
+        if (UNIT_DIR / unit_name).exists() or run('systemctl', 'cat', service, check=False).returncode == 0:
             raise RuntimeError('Existing unit: ' + service)
-    for proto, ports in [('tcp', [args.reality_port, args.ss_port]), ('udp', [args.hysteria_port, args.ss_port])]:
+    ports_by_proto = (six.bindings(vars(args), args.tls_mode == 'public-ip') if extended else
+                      {'tcp': [args.reality_port, args.ss_port], 'udp': [args.hysteria_port, args.ss_port]})
+    if extended:
+        if args.tls_mode == 'public-ip':
+            if not shutil.which('socat'):
+                raise RuntimeError('public-ip certificates require socat for HTTP-01 on TCP80')
+            if args.tls_name or args.cert_file or args.key_file:
+                raise ValueError('public-ip mode does not accept provided certificate options')
+        else:
+            if not args.cert_file or not args.key_file:
+                raise ValueError('provided mode requires --cert-file and --key-file on the target server')
+            six.check_provided(args, run)
+    for proto, ports in ports_by_proto.items():
         flag = '-lntH' if proto == 'tcp' else '-lnuH'
         for port in ports:
             if run('ss', flag, f'sport = :{port}').stdout.strip():
@@ -72,6 +88,13 @@ def parse_keys(text):
 
 
 def install(args):
+    if getattr(args, 'profile', 'three') == 'six':
+        import six_protocols as six
+        return six.install(args, sys.modules[__name__])
+    return install_three(args)
+
+
+def install_three(args):
     preflight(args)
     arch = {'x86_64': 'amd64', 'aarch64': 'arm64'}.get(platform.machine())
     if not arch:
@@ -143,8 +166,13 @@ WantedBy=multi-user.target
 
 def uninstall():
     marker = ROOT / 'managed-by'
-    if ROOT.is_symlink() or not marker.is_file() or marker.read_text() != MARKER:
+    if ROOT.is_symlink() or not marker.is_file():
         raise RuntimeError('Ownership marker missing; refusing deletion')
+    import six_protocols as six
+    if marker.read_text() == six.MARKER:
+        return six.uninstall(sys.modules[__name__])
+    if marker.read_text() != MARKER:
+        raise RuntimeError('Ownership marker unknown; refusing deletion')
     for name in SERVICES:
         unit = UNIT_DIR / (name + '.service')
         if unit.is_symlink() or not unit.is_file() or f'ExecStart={ROOT}/' not in unit.read_text():
@@ -163,9 +191,17 @@ def main():
     p = sub.add_parser('install')
     p.add_argument('--host', required=True)
     p.add_argument('--target', required=True)
+    p.add_argument('--profile', choices=['six', 'three'], default='six')
     p.add_argument('--reality-port', type=int, default=443)
-    p.add_argument('--hysteria-port', type=int, default=443)
+    p.add_argument('--hysteria-port', type=int, default=24443)
     p.add_argument('--ss-port', type=int, default=8388)
+    p.add_argument('--trojan-port', type=int, default=8443)
+    p.add_argument('--tuic-port', type=int, default=8443)
+    p.add_argument('--anytls-port', type=int, default=9443)
+    p.add_argument('--tls-mode', choices=['public-ip', 'provided'], default='public-ip')
+    p.add_argument('--tls-name')
+    p.add_argument('--cert-file')
+    p.add_argument('--key-file')
     p.add_argument('--lock', default=str(Path(__file__).with_name('versions.lock.json')))
     p.add_argument('--firewall-reviewed', action='store_true')
     sub.add_parser('status')
@@ -181,10 +217,22 @@ def main():
         elif args.action == 'uninstall':
             uninstall()
         else:
-            result = run('systemctl', 'is-active', *SERVICES, check=False)
+            import six_protocols as six
+            marker = ROOT / 'managed-by'
+            extended = marker.is_file() and marker.read_text() == six.MARKER
+            services = six.SERVICES if extended else SERVICES
+            if extended and 'mpn-certificate.timer' in json.loads((ROOT / 'managed-units.json').read_text()):
+                services = (*services, 'mpn-certificate.timer')
+            result = run('systemctl', 'is-active', *services, check=False)
             print(result.stdout.strip())
-            print(run('systemctl', 'is-enabled', *SERVICES, check=False).stdout.strip())
-            return result.returncode
+            enabled = run('systemctl', 'is-enabled', *services, check=False)
+            print(enabled.stdout.strip())
+            cert_status = 0
+            if extended:
+                cert = run('openssl', 'x509', '-in', str(ROOT / 'public-fullchain.pem'),
+                           '-noout', '-dates', '-checkend', '86400', check=False)
+                print(cert.stdout.strip()); cert_status = cert.returncode
+            return result.returncode or enabled.returncode or cert_status
     return 0
 
 

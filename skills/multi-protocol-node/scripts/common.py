@@ -10,6 +10,7 @@ import urllib.parse
 import urllib.request
 import zipfile
 import io
+import tarfile
 
 ROOT = Path('/opt/multi-protocol-node')
 SERVICES = ('mpn-xray', 'mpn-hysteria')
@@ -40,9 +41,10 @@ def secure_write(path, value):
         f.write(value)
 
 
-def download_asset(asset, destination, zip_member=None):
+def download_asset(asset, destination, zip_member=None, tar_member=None):
     url = asset['url']
-    if not url.startswith('https://github.com/'):
+    if not (url.startswith('https://github.com/') or re.fullmatch(
+            r'https://raw.githubusercontent.com/acmesh-official/acme.sh/[0-9a-f]{40}/acme.sh', url)):
         raise ValueError('Only pinned GitHub release URLs are accepted')
     with urllib.request.urlopen(url, timeout=90) as r:
         data = r.read()
@@ -51,6 +53,13 @@ def download_asset(asset, destination, zip_member=None):
     if zip_member:
         # Never extract an upstream archive tree into the filesystem.
         data = zipfile.ZipFile(io.BytesIO(data)).read(zip_member)
+    if tar_member:
+        with tarfile.open(fileobj=io.BytesIO(data), mode='r:gz') as archive:
+            matches = [m for m in archive.getmembers() if m.isfile() and
+                       m.name.split('/')[-1] == tar_member]
+            if len(matches) != 1:
+                raise ValueError('Archive must contain exactly one regular executable')
+            data = archive.extractfile(matches[0]).read()
     with open(destination, 'xb') as f:
         f.write(data)
     Path(destination).chmod(0o700)
@@ -81,6 +90,9 @@ def endpoint(host, port):
 
 
 def share_links(m):
+    if m.get('profile') == 'six':
+        from six_protocols import links
+        return links(m)
     q = urllib.parse.urlencode({'encryption': 'none', 'security': 'reality', 'sni': m['target'],
         'fp': 'chrome', 'pbk': m['public_key'], 'sid': m['short_id'], 'type': 'tcp', 'flow': 'xtls-rprx-vision'})
     vless = f"vless://{m['uuid']}@{endpoint(m['host'], m['reality_port'])}?{q}#Node-REALITY"
